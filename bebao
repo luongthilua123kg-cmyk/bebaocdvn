@@ -1,0 +1,159 @@
+-- PvP Mobile Toolbar Nâng Cấp
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LP = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- State
+local target = nil
+local spinOn, jumpOn, attackOn = false, false, false
+local HRP, Hum, Char
+
+-- Setup char
+local function setupChar(c)
+    Char = c
+    Hum = Char:WaitForChild("Humanoid")
+    HRP = Char:WaitForChild("HumanoidRootPart")
+end
+setupChar(LP.Character or LP.CharacterAdded:Wait())
+LP.CharacterAdded:Connect(setupChar)
+
+-- Find nearest enemy
+local function getNearestEnemy()
+    if not HRP then return nil end
+    local best, dist = nil, math.huge
+    for _,plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LP and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            local d = (HRP.Position - plr.Character.HumanoidRootPart.Position).Magnitude
+            if d < dist then
+                best, dist = plr, d
+            end
+        end
+    end
+    return best
+end
+
+-- Tool equip
+local function getTool()
+    if not Char then return nil end
+    local tool = Char:FindFirstChildOfClass("Tool")
+    if tool then return tool end
+    for _,t in ipairs(LP.Backpack:GetChildren()) do
+        if t:IsA("Tool") then
+            Hum:EquipTool(t)
+            return t
+        end
+    end
+end
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "PvP_GUI_Upgraded"
+gui.ResetOnSpawn = false
+gui.Parent = LP:WaitForChild("PlayerGui")
+
+-- Main Panel
+local panel = Instance.new("Frame")
+panel.Size = UDim2.new(0,350,0,70)
+panel.Position = UDim2.new(0.5,-175,0,80)
+panel.BackgroundColor3 = Color3.fromRGB(25,25,25)
+panel.BorderSizePixel = 0
+panel.Active = true
+panel.Draggable = true
+panel.Parent = gui
+Instance.new("UICorner", panel).CornerRadius = UDim.new(0,12)
+
+local UIList = Instance.new("UIListLayout", panel)
+UIList.FillDirection = Enum.FillDirection.Horizontal
+UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+UIList.VerticalAlignment = Enum.VerticalAlignment.Center
+UIList.Padding = UDim.new(0,8)
+
+-- Toggle Menu Button
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0,50,0,50)
+toggleBtn.Position = UDim2.new(0,10,0,10)
+toggleBtn.Text = "-"
+toggleBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+toggleBtn.TextColor3 = Color3.new(1,1,1)
+toggleBtn.TextScaled = true
+toggleBtn.Parent = gui
+
+toggleBtn.MouseButton1Click:Connect(function()
+    panel.Visible = not panel.Visible
+    toggleBtn.Text = panel.Visible and "-" or "+"
+end)
+
+-- Create Buttons
+local function makeBtn(name, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0,80,1,-10)
+    btn.Text = name
+    btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.TextScaled = true
+    btn.Parent = panel
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+makeBtn("Lock", function()
+    if target then
+        target = nil
+        warn("🔓 Unlock target")
+    else
+        target = getNearestEnemy()
+        if target then warn("🔒 Locked: "..target.Name) end
+    end
+end)
+
+makeBtn("Spin", function()
+    spinOn = not spinOn
+    warn("Spin: "..tostring(spinOn))
+end)
+
+makeBtn("Jump", function()
+    jumpOn = not jumpOn
+    warn("Jump: "..tostring(jumpOn))
+end)
+
+makeBtn("Attack", function()
+    attackOn = not attackOn
+    warn("Attack: "..tostring(attackOn))
+end)
+
+-- Main Loop
+RunService.RenderStepped:Connect(function()
+    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") and HRP and Hum then
+        local enemyHRP = target.Character.HumanoidRootPart
+
+        -- Lock nhìn
+        local look = (enemyHRP.Position - HRP.Position).Unit
+        HRP.CFrame = CFrame.new(HRP.Position, HRP.Position + Vector3.new(look.X,0,look.Z))
+
+        -- Attack
+        if attackOn and (HRP.Position - enemyHRP.Position).Magnitude < 8 then
+            local tool = getTool()
+            if tool and tool:FindFirstChild("Activate") then
+                tool:Activate()
+            end
+        end
+
+        -- Spin mượt
+        if spinOn then
+            local t = tick() * 4
+            local r = 7
+            local offset = Vector3.new(math.cos(t),0,math.sin(t)) * r
+            HRP.CFrame = CFrame.new(enemyHRP.Position + offset, enemyHRP.Position)
+        end
+    elseif spinOn and HRP then
+        -- Spin tại chỗ nếu không có target
+        HRP.CFrame = HRP.CFrame * CFrame.Angles(0, math.rad(10), 0)
+    end
+
+    if jumpOn and Hum and Hum.FloorMaterial ~= Enum.Material.Air then
+        Hum.Jump = true
+    end
+end)
+
+warn("✅ PvP Mobile Toolbar Upgraded Loaded (Spin mượt, Panel to, Toggle menu, Auto Attack/Jump)")
