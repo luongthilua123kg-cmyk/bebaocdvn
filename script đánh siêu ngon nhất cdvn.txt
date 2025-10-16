@@ -1,0 +1,251 @@
+-- ⚔️ PvP Toolbar (Fling Fast Attack) — by BEBAO
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+
+    Name="⚔️ PvP Fast Panel",
+
+    LoadingTitle="PvP Panel",
+
+    LoadingSubtitle="by BEBAO",
+
+    ConfigurationSaving={Enabled=false},
+
+    Discord={Enabled=false},
+
+    KeySystem=false
+
+})
+
+-- Services
+
+local Players = game:GetService("Players")
+
+local RunService = game:GetService("RunService")
+
+local LP = Players.LocalPlayer
+
+local Char, Hum, HRP
+
+local target = nil
+
+-- States
+
+local fastAttackOn, spinOn, spinLockOn = false, false, false
+
+local spinSpeed = 10 -- default speed
+
+-- Setup character
+
+local function setupChar(c)
+
+    Char = c
+
+    Hum = Char:WaitForChild("Humanoid")
+
+    HRP = Char:WaitForChild("HumanoidRootPart")
+
+end
+
+setupChar(LP.Character or LP.CharacterAdded:Wait())
+
+LP.CharacterAdded:Connect(setupChar)
+
+-- Get nearest enemy
+
+local function getNearestEnemy()
+
+    if not HRP then return nil end
+
+    local best, dist = nil, math.huge
+
+    for _,plr in ipairs(Players:GetPlayers()) do
+
+        if plr ~= LP and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+
+            local d = (HRP.Position - plr.Character.HumanoidRootPart.Position).Magnitude
+
+            if d < dist then best, dist = plr, d end
+
+        end
+
+    end
+
+    return best
+
+end
+
+-- Get tool
+
+local function getTool()
+
+    if not Char then return nil end
+
+    local tool = Char:FindFirstChildOfClass("Tool")
+
+    if tool then return tool end
+
+    for _,t in ipairs(LP.Backpack:GetChildren()) do
+
+        if t:IsA("Tool") then
+
+            Hum:EquipTool(t)
+
+            return t
+
+        end
+
+    end
+
+end
+
+-- ===== Tab =====
+
+local mainTab = Window:CreateTab("⚔️ PvP", 4483362458)
+
+local statusLabel = mainTab:CreateLabel("Status: Idle")
+
+mainTab:CreateButton({
+
+    Name = "🎯 Lock Nearest / Unlock",
+
+    Callback = function()
+
+        if target then
+
+            target = nil
+
+            statusLabel:Set("Status: Unlock target")
+
+        else
+
+            target = getNearestEnemy()
+
+            if target then
+
+                statusLabel:Set("Status: Locked -> "..target.Name)
+
+            else
+
+                statusLabel:Set("Status: No target")
+
+            end
+
+        end
+
+    end
+
+})
+
+mainTab:CreateToggle({
+
+    Name = "🗡️ Auto Attack Nhanh (Fling + Spam)",
+
+    CurrentValue = false,
+
+    Callback = function(val) fastAttackOn = val; statusLabel:Set("Fast Attack: "..tostring(val)) end
+
+})
+
+mainTab:CreateToggle({
+
+    Name = "🌀 Spin Only (Speed chỉnh, ko đánh)",
+
+    CurrentValue = false,
+
+    Callback = function(val) spinOn = val; statusLabel:Set("Spin Only: "..tostring(val)) end
+
+})
+
+mainTab:CreateSlider({
+
+    Name = "⚡ Spin Speed",
+
+    Range = {1, 50},
+
+    Increment = 1,
+
+    CurrentValue = 10,
+
+    Callback = function(val) spinSpeed = val end
+
+})
+
+mainTab:CreateToggle({
+
+    Name = "🔄 Spin + Lock Sau Lưng (Spam đánh)",
+
+    CurrentValue = false,
+
+    Callback = function(val) spinLockOn = val; statusLabel:Set("Spin+Lock: "..tostring(val)) end
+
+})
+
+-- ===== Loop =====
+
+RunService.RenderStepped:Connect(function()
+
+    if not HRP or not Hum then return end
+
+    if (fastAttackOn or spinOn or spinLockOn) and (not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart")) then
+
+        target = getNearestEnemy()
+
+    end
+
+    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+
+        local enemyHRP = target.Character.HumanoidRootPart
+
+        -- Auto Attack Nhanh: spin cực nhanh + auto spam đánh
+
+        if fastAttackOn then
+
+            local t = tick() * 40 -- spin siêu nhanh fix speed
+
+            local r = 7
+
+            local offset = Vector3.new(math.cos(t) * r, 0, math.sin(t) * r)
+
+            HRP.CFrame = CFrame.new(enemyHRP.Position + offset, enemyHRP.Position)
+
+            local tool = getTool()
+
+            if tool then tool:Activate() end -- spam attack
+
+        end
+
+        -- Spin Only: speed chỉnh, không đánh
+
+        if spinOn then
+
+            local t = tick() * spinSpeed
+
+            local r = 7
+
+            local offset = Vector3.new(math.cos(t) * r, 0, math.sin(t) * r)
+
+            HRP.CFrame = CFrame.new(enemyHRP.Position + offset, enemyHRP.Position)
+
+        end
+
+        -- Spin+Lock sau lưng target + auto spam attack
+
+        if spinLockOn then
+
+            local look = enemyHRP.CFrame.LookVector
+
+            local offset = -look * 3 + Vector3.new(0,1,0)
+
+            HRP.CFrame = CFrame.new(enemyHRP.Position + offset, enemyHRP.Position)
+
+            local tool = getTool()
+
+            if tool then tool:Activate() end
+
+        end
+
+    end
+
+end)
